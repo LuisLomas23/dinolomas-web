@@ -64,6 +64,8 @@ let microphone = null;
 let micEnabled = false;
 let volume = 0;
 
+const SOUND_THRESHOLD = 18; // 🔧 AJUSTA AQUÍ
+
 const micButton = document.getElementById("micButton");
 const micStatus = document.getElementById("micStatus");
 const startButton = document.getElementById("startButton");
@@ -107,7 +109,7 @@ startButton.addEventListener("click", () => {
 });
 
 // ================================
-// MICRÓFONO VOLUMEN
+// MICRÓFONO - VOLUMEN
 // ================================
 function getMicVolume() {
     if (!micEnabled || !analyser) return 0;
@@ -127,8 +129,6 @@ function getMicVolume() {
 // SALTO
 // ================================
 function jump() {
-    if (!dino.onGround) return;
-
     dino.velocityY = -jumpForce;
     dino.onGround = false;
     jumpCount++;
@@ -139,7 +139,7 @@ function jump() {
 }
 
 // ================================
-// RESET JUEGO
+// RESET
 // ================================
 function resetGame() {
     logs = [];
@@ -158,15 +158,14 @@ function resetGame() {
 function update() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Dibujar piso siempre
+    // Piso
     ctx.fillStyle = "#8B4513";
     ctx.fillRect(0, groundY, canvas.width, 40);
 
-    // Dibujar dino siempre
+    // Dino
     ctx.drawImage(dinoImg, dino.x, dino.y, dino.width, dino.height);
 
     if (!gameStarted) {
-        // Pantalla de espera
         ctx.fillStyle = "#000";
         ctx.font = "24px Arial";
         ctx.fillText("Activa el micrófono y presiona INICIAR", 120, 150);
@@ -179,7 +178,10 @@ function update() {
     // ================================
     volume = getMicVolume();
 
-    // 🔴 AÚN NO usamos volumen para saltar (siguiente paso)
+    // 🔴 SALTO POR VOZ
+    if (volume > SOUND_THRESHOLD && dino.onGround) {
+        jump();
+    }
 
     // Gravedad
     dino.velocityY += gravity;
