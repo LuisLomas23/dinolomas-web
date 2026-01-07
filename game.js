@@ -5,15 +5,15 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 // ================================
-// ESTADO DEL JUEGO
+// ESTADO
 // ================================
 let gameStarted = false;
 
 // ================================
-// VARIABLES DEL JUEGO
+// VELOCIDAD
 // ================================
-let jumpCount = 0;
 let speed = 6;
+let jumpCount = 0;
 const speedIncrement = 1;
 const maxSpeed = 16;
 
@@ -25,26 +25,42 @@ dinoImg.src = "dino.png";
 
 const dino = {
     x: 80,
-    y: 200,
+    y: 0,
     width: 60,
     height: 60,
     velocityY: 0,
-    onGround: true
+    onGround: false
 };
 
 const gravity = 0.9;
 
-// 🔴 SALTO POR VOZ
+// ================================
+// SALTO POR VOZ
+// ================================
 const SOUND_THRESHOLD = 5;
 const MIN_JUMP = 8;
 const MAX_JUMP = 22;
-
 let canJumpBySound = true;
 
 // ================================
-// PISO
+// PISO Y ABISMOS
 // ================================
 const groundY = 260;
+const groundHeight = 40;
+
+let groundSegments = [];
+let groundTimer = 0;
+
+function createGroundSegment() {
+    const isGap = Math.random() < 0.25; // 25% abismos
+    const width = isGap ? 80 + Math.random() * 80 : 120 + Math.random() * 80;
+
+    return {
+        x: canvas.width,
+        width,
+        isGap
+    };
+}
 
 // ================================
 // TRONCOS
@@ -66,7 +82,6 @@ function createLog() {
 // ================================
 let audioContext = null;
 let analyser = null;
-let microphone = null;
 let micEnabled = false;
 let volume = 0;
 
@@ -74,73 +89,52 @@ const micButton = document.getElementById("micButton");
 const micStatus = document.getElementById("micStatus");
 const startButton = document.getElementById("startButton");
 
-micButton.addEventListener("click", async () => {
+micButton.onclick = async () => {
     if (micEnabled) return;
 
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
 
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        if (audioContext.state === "suspended") {
-            await audioContext.resume();
-        }
+    const mic = audioContext.createMediaStreamSource(stream);
+    mic.connect(analyser);
 
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
+    micEnabled = true;
+    micStatus.textContent = "Micrófono: activo ✅";
+};
 
-        microphone = audioContext.createMediaStreamSource(stream);
-        microphone.connect(analyser);
-
-        micEnabled = true;
-        micStatus.textContent = "Micrófono: activo ✅";
-    } catch (err) {
-        micStatus.textContent = "Micrófono: error ❌";
-        console.error(err);
-    }
-});
-
-// ================================
-// BOTÓN INICIAR
-// ================================
-startButton.addEventListener("click", () => {
+startButton.onclick = () => {
     if (!micEnabled) {
-        alert("Primero activa el micrófono 🎤");
+        alert("Activa el micrófono primero");
         return;
     }
-
     resetGame();
     gameStarted = true;
-});
+};
 
 // ================================
 // MIC VOLUMEN
 // ================================
 function getMicVolume() {
-    if (!micEnabled || !analyser) return 0;
-
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);
-    analyser.getByteTimeDomainData(dataArray);
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteTimeDomainData(data);
 
     let sum = 0;
-    for (let i = 0; i < dataArray.length; i++) {
-        sum += Math.abs(dataArray[i] - 128);
+    for (let i = 0; i < data.length; i++) {
+        sum += Math.abs(data[i] - 128);
     }
-
-    return sum / dataArray.length;
+    return sum / data.length;
 }
 
 // ================================
 // SALTO PROPORCIONAL
 // ================================
 function jumpWithVoice(volume) {
-    // Normalizamos volumen
-    let jumpStrength = volume * 1.2;
+    let force = volume * 1.2;
+    force = Math.max(MIN_JUMP, Math.min(MAX_JUMP, force));
 
-    // Clamps
-    if (jumpStrength < MIN_JUMP) jumpStrength = MIN_JUMP;
-    if (jumpStrength > MAX_JUMP) jumpStrength = MAX_JUMP;
-
-    dino.velocityY = -jumpStrength;
+    dino.velocityY = -force;
     dino.onGround = false;
     jumpCount++;
 
@@ -154,13 +148,16 @@ function jumpWithVoice(volume) {
 // ================================
 function resetGame() {
     logs = [];
+    groundSegments = [];
+    groundTimer = 0;
     logTimer = 0;
-    jumpCount = 0;
-    speed = 6;
 
-    dino.y = groundY - dino.height;
+    speed = 6;
+    jumpCount = 0;
+
+    dino.y = 0;
     dino.velocityY = 0;
-    dino.onGround = true;
+    dino.onGround = false;
     canJumpBySound = true;
 }
 
@@ -170,46 +167,70 @@ function resetGame() {
 function update() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Piso
-    ctx.fillStyle = "#8B4513";
-    ctx.fillRect(0, groundY, canvas.width, 40);
-
-    // Dino
-    ctx.drawImage(dinoImg, dino.x, dino.y, dino.width, dino.height);
-
     if (!gameStarted) {
-        ctx.fillStyle = "#000";
         ctx.font = "24px Arial";
         ctx.fillText("Activa el micrófono y presiona INICIAR", 120, 150);
         requestAnimationFrame(update);
         return;
     }
 
+    // ================================
+    // MICRÓFONO
+    // ================================
     volume = getMicVolume();
 
-    // 🔴 SALTO POR INTENSIDAD
     if (volume > SOUND_THRESHOLD && dino.onGround && canJumpBySound) {
         jumpWithVoice(volume);
         canJumpBySound = false;
     }
-
     if (volume < SOUND_THRESHOLD) {
         canJumpBySound = true;
     }
 
-    // Gravedad
+    // ================================
+    // GRAVEDAD
+    // ================================
     dino.velocityY += gravity;
     dino.y += dino.velocityY;
 
-    if (dino.y + dino.height >= groundY) {
-        dino.y = groundY - dino.height;
-        dino.velocityY = 0;
-        dino.onGround = true;
+    dino.onGround = false;
+
+    // ================================
+    // PISO / ABISMOS
+    // ================================
+    groundTimer++;
+    if (groundTimer > 80) {
+        groundSegments.push(createGroundSegment());
+        groundTimer = 0;
     }
 
-    // Troncos
+    groundSegments.forEach(seg => seg.x -= speed);
+    groundSegments = groundSegments.filter(seg => seg.x + seg.width > 0);
+
+    groundSegments.forEach(seg => {
+        if (!seg.isGap) {
+            ctx.fillStyle = "#8B4513";
+            ctx.fillRect(seg.x, groundY, seg.width, groundHeight);
+
+            if (
+                dino.x + dino.width > seg.x &&
+                dino.x < seg.x + seg.width &&
+                dino.y + dino.height >= groundY &&
+                dino.y + dino.height <= groundY + 20 &&
+                dino.velocityY >= 0
+            ) {
+                dino.y = groundY - dino.height;
+                dino.velocityY = 0;
+                dino.onGround = true;
+            }
+        }
+    });
+
+    // ================================
+    // TRONCOS
+    // ================================
     logTimer++;
-    if (logTimer > 90) {
+    if (logTimer > 120) {
         logs.push(createLog());
         logTimer = 0;
     }
@@ -217,8 +238,8 @@ function update() {
     logs.forEach(log => log.x -= speed);
     logs = logs.filter(log => log.x + log.width > 0);
 
-    // Colisiones
     logs.forEach(log => {
+        ctx.fillRect(log.x, log.y, log.width, log.height);
         if (
             dino.x < log.x + log.width &&
             dino.x + dino.width > log.x &&
@@ -230,13 +251,24 @@ function update() {
         }
     });
 
-    logs.forEach(log => {
-        ctx.fillRect(log.x, log.y, log.width, log.height);
-    });
+    // ================================
+    // CAÍDA AL VACÍO
+    // ================================
+    if (dino.y > canvas.height) {
+        alert("Caíste al abismo 😵");
+        gameStarted = false;
+    }
 
+    // ================================
+    // DIBUJAR DINO
+    // ================================
+    ctx.drawImage(dinoImg, dino.x, dino.y, dino.width, dino.height);
+
+    // ================================
     // UI
-    ctx.fillStyle = "#000";
+    // ================================
     ctx.font = "20px Arial";
+    ctx.fillStyle = "#000";
     ctx.fillText("DinoLomas", 10, 25);
     ctx.fillText(`Saltos: ${jumpCount}`, canvas.width - 120, 25);
     ctx.fillText(`Volumen: ${volume.toFixed(1)}`, 10, 50);
