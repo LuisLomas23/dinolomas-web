@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>DinoLomas</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+
     <style>
         body {
             margin: 0;
@@ -12,19 +13,42 @@
             justify-content: center;
             align-items: center;
             height: 100vh;
+            font-family: Arial, sans-serif;
         }
+
+        .container {
+            text-align: center;
+        }
+
+        .controls {
+            margin-bottom: 10px;
+        }
+
+        button {
+            padding: 8px 14px;
+            font-size: 16px;
+            margin: 5px;
+            cursor: pointer;
+        }
+
         canvas {
             border: 2px solid #000;
         }
     </style>
 </head>
 <body>
-    <div style="text-align:center; margin-bottom:10px;">
-        <button id="micButton">🎤 Activar micrófono</button>
-        <p id="micStatus">Micrófono: apagado</p>
-    </div>
 
-    <canvas id="gameCanvas" width="800" height="300"></canvas>
+    <div class="container">
+
+        <div class="controls">
+            <button id="micButton">🎤 Activar micrófono</button>
+            <button id="startButton">▶️ Iniciar</button>
+            <p id="micStatus">Micrófono: apagado</p>
+        </div>
+
+        <canvas id="gameCanvas" width="800" height="300"></canvas>
+
+    </div>
 
     <script src="game.js"></script>
 </body>
