@@ -64,7 +64,8 @@ let microphone = null;
 let micEnabled = false;
 let volume = 0;
 
-const SOUND_THRESHOLD = 18; // 🔧 AJUSTA AQUÍ
+const SOUND_THRESHOLD = 6; // 🔴 CLAVE PARA SAFARI
+let canJumpBySound = true;
 
 const micButton = document.getElementById("micButton");
 const micStatus = document.getElementById("micStatus");
@@ -109,7 +110,7 @@ startButton.addEventListener("click", () => {
 });
 
 // ================================
-// MICRÓFONO - VOLUMEN
+// VOLUMEN MIC
 // ================================
 function getMicVolume() {
     if (!micEnabled || !analyser) return 0;
@@ -150,6 +151,7 @@ function resetGame() {
     dino.y = groundY - dino.height;
     dino.velocityY = 0;
     dino.onGround = true;
+    canJumpBySound = true;
 }
 
 // ================================
@@ -178,9 +180,14 @@ function update() {
     // ================================
     volume = getMicVolume();
 
-    // 🔴 SALTO POR VOZ
-    if (volume > SOUND_THRESHOLD && dino.onGround) {
+    // 🔴 SALTO POR PICO DE SONIDO
+    if (volume > SOUND_THRESHOLD && dino.onGround && canJumpBySound) {
         jump();
+        canJumpBySound = false;
+    }
+
+    if (volume < SOUND_THRESHOLD) {
+        canJumpBySound = true;
     }
 
     // Gravedad
@@ -231,7 +238,4 @@ function update() {
     requestAnimationFrame(update);
 }
 
-// ================================
-// ARRANQUE
-// ================================
 update();
