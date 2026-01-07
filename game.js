@@ -1,11 +1,11 @@
 // ================================
-// Canvas
+// CANVAS
 // ================================
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 // ================================
-// Variables del juego
+// VARIABLES DEL JUEGO
 // ================================
 let jumpCount = 0;
 let speed = 6;
@@ -13,7 +13,7 @@ const speedIncrement = 1;
 const maxSpeed = 16;
 
 // ================================
-// Dinosaurio
+// DINOSAURIO
 // ================================
 const dinoImg = new Image();
 dinoImg.src = "dino.png";
@@ -31,12 +31,12 @@ const gravity = 0.9;
 const jumpForce = 16;
 
 // ================================
-// Piso
+// PISO
 // ================================
 const groundY = 260;
 
 // ================================
-// Troncos
+// TRONCOS
 // ================================
 let logs = [];
 let logTimer = 0;
@@ -51,11 +51,11 @@ function createLog() {
 }
 
 // ================================
-// MICRÓFONO
+// MICRÓFONO (COMPATIBLE SAFARI)
 // ================================
-let audioContext;
-let analyser;
-let microphone;
+let audioContext = null;
+let analyser = null;
+let microphone = null;
 let micEnabled = false;
 let volume = 0;
 
@@ -69,44 +69,43 @@ micButton.addEventListener("click", async () => {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        analyser = audioContext.createAnalyser();
-        microphone = audioContext.createMediaStreamSource(stream);
 
-        microphone.connect(analyser);
+        // 🔴 FIX CRÍTICO PARA SAFARI
+        if (audioContext.state === "suspended") {
+            await audioContext.resume();
+        }
+
+        analyser = audioContext.createAnalyser();
         analyser.fftSize = 256;
+
+        microphone = audioContext.createMediaStreamSource(stream);
+        microphone.connect(analyser);
 
         micEnabled = true;
         micStatus.textContent = "Micrófono: activo ✅";
     } catch (err) {
         micStatus.textContent = "Micrófono: error ❌";
-        console.error(err);
+        console.error("Error micrófono:", err);
     }
 });
 
 function getMicVolume() {
-    if (!micEnabled) return 0;
+    if (!micEnabled || !analyser) return 0;
 
     const dataArray = new Uint8Array(analyser.frequencyBinCount);
     analyser.getByteTimeDomainData(dataArray);
 
     let sum = 0;
     for (let i = 0; i < dataArray.length; i++) {
-        const value = dataArray[i] - 128;
-        sum += Math.abs(value);
+        sum += Math.abs(dataArray[i] - 128);
     }
 
     return sum / dataArray.length;
 }
 
 // ================================
-// CONTROLES TECLADO (B)
+// SALTO
 // ================================
-document.addEventListener("keydown", (e) => {
-    if (e.key.toLowerCase() === "b" && dino.onGround) {
-        jump();
-    }
-});
-
 function jump() {
     dino.velocityY = -jumpForce;
     dino.onGround = false;
@@ -116,6 +115,15 @@ function jump() {
         speed += speedIncrement;
     }
 }
+
+// ================================
+// TECLADO (B)
+// ================================
+document.addEventListener("keydown", (e) => {
+    if (e.key.toLowerCase() === "b" && dino.onGround) {
+        jump();
+    }
+});
 
 // ================================
 // LOOP PRINCIPAL
@@ -156,9 +164,7 @@ function update() {
         }
     });
 
-    // ================================
-    // MICRÓFONO (solo lectura por ahora)
-    // ================================
+    // Micrófono (solo lectura)
     volume = getMicVolume();
 
     // ================================
