@@ -5,6 +5,11 @@ const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
 // ================================
+// ESTADO DEL JUEGO
+// ================================
+let gameStarted = false;
+
+// ================================
 // VARIABLES DEL JUEGO
 // ================================
 let jumpCount = 0;
@@ -51,7 +56,7 @@ function createLog() {
 }
 
 // ================================
-// MICRÓFONO (COMPATIBLE SAFARI)
+// MICRÓFONO
 // ================================
 let audioContext = null;
 let analyser = null;
@@ -61,6 +66,7 @@ let volume = 0;
 
 const micButton = document.getElementById("micButton");
 const micStatus = document.getElementById("micStatus");
+const startButton = document.getElementById("startButton");
 
 micButton.addEventListener("click", async () => {
     if (micEnabled) return;
@@ -69,8 +75,6 @@ micButton.addEventListener("click", async () => {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
-
-        // 🔴 FIX CRÍTICO PARA SAFARI
         if (audioContext.state === "suspended") {
             await audioContext.resume();
         }
@@ -85,10 +89,26 @@ micButton.addEventListener("click", async () => {
         micStatus.textContent = "Micrófono: activo ✅";
     } catch (err) {
         micStatus.textContent = "Micrófono: error ❌";
-        console.error("Error micrófono:", err);
+        console.error(err);
     }
 });
 
+// ================================
+// BOTÓN INICIAR
+// ================================
+startButton.addEventListener("click", () => {
+    if (!micEnabled) {
+        alert("Primero activa el micrófono 🎤");
+        return;
+    }
+
+    resetGame();
+    gameStarted = true;
+});
+
+// ================================
+// MICRÓFONO VOLUMEN
+// ================================
 function getMicVolume() {
     if (!micEnabled || !analyser) return 0;
 
@@ -107,6 +127,8 @@ function getMicVolume() {
 // SALTO
 // ================================
 function jump() {
+    if (!dino.onGround) return;
+
     dino.velocityY = -jumpForce;
     dino.onGround = false;
     jumpCount++;
@@ -117,19 +139,47 @@ function jump() {
 }
 
 // ================================
-// TECLADO (B)
+// RESET JUEGO
 // ================================
-document.addEventListener("keydown", (e) => {
-    if (e.key.toLowerCase() === "b" && dino.onGround) {
-        jump();
-    }
-});
+function resetGame() {
+    logs = [];
+    logTimer = 0;
+    jumpCount = 0;
+    speed = 6;
+
+    dino.y = groundY - dino.height;
+    dino.velocityY = 0;
+    dino.onGround = true;
+}
 
 // ================================
 // LOOP PRINCIPAL
 // ================================
 function update() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Dibujar piso siempre
+    ctx.fillStyle = "#8B4513";
+    ctx.fillRect(0, groundY, canvas.width, 40);
+
+    // Dibujar dino siempre
+    ctx.drawImage(dinoImg, dino.x, dino.y, dino.width, dino.height);
+
+    if (!gameStarted) {
+        // Pantalla de espera
+        ctx.fillStyle = "#000";
+        ctx.font = "24px Arial";
+        ctx.fillText("Activa el micrófono y presiona INICIAR", 120, 150);
+        requestAnimationFrame(update);
+        return;
+    }
+
+    // ================================
+    // JUEGO ACTIVO
+    // ================================
+    volume = getMicVolume();
+
+    // 🔴 AÚN NO usamos volumen para saltar (siguiente paso)
 
     // Gravedad
     dino.velocityY += gravity;
@@ -160,22 +210,9 @@ function update() {
             dino.y + dino.height > log.y
         ) {
             alert("Game Over");
-            location.reload();
+            gameStarted = false;
         }
     });
-
-    // Micrófono (solo lectura)
-    volume = getMicVolume();
-
-    // ================================
-    // DIBUJO
-    // ================================
-    // Piso
-    ctx.fillStyle = "#8B4513";
-    ctx.fillRect(0, groundY, canvas.width, 40);
-
-    // Dino
-    ctx.drawImage(dinoImg, dino.x, dino.y, dino.width, dino.height);
 
     // Troncos
     logs.forEach(log => {
@@ -192,4 +229,7 @@ function update() {
     requestAnimationFrame(update);
 }
 
+// ================================
+// ARRANQUE
+// ================================
 update();
