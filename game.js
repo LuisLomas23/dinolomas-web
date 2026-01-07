@@ -64,7 +64,7 @@ let microphone = null;
 let micEnabled = false;
 let volume = 0;
 
-const SOUND_THRESHOLD = 6; // 🔴 CLAVE PARA SAFARI
+const SOUND_THRESHOLD = 4; // 🔴 CLAVE PARA SAFARI
 let canJumpBySound = true;
 
 const micButton = document.getElementById("micButton");
