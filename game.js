@@ -33,7 +33,13 @@ const dino = {
 };
 
 const gravity = 0.9;
-const jumpForce = 16;
+
+// 🔴 SALTO POR VOZ
+const SOUND_THRESHOLD = 5;
+const MIN_JUMP = 8;
+const MAX_JUMP = 22;
+
+let canJumpBySound = true;
 
 // ================================
 // PISO
@@ -63,9 +69,6 @@ let analyser = null;
 let microphone = null;
 let micEnabled = false;
 let volume = 0;
-
-const SOUND_THRESHOLD = 4; // 🔴 CLAVE PARA SAFARI
-let canJumpBySound = true;
 
 const micButton = document.getElementById("micButton");
 const micStatus = document.getElementById("micStatus");
@@ -110,7 +113,7 @@ startButton.addEventListener("click", () => {
 });
 
 // ================================
-// VOLUMEN MIC
+// MIC VOLUMEN
 // ================================
 function getMicVolume() {
     if (!micEnabled || !analyser) return 0;
@@ -127,10 +130,17 @@ function getMicVolume() {
 }
 
 // ================================
-// SALTO
+// SALTO PROPORCIONAL
 // ================================
-function jump() {
-    dino.velocityY = -jumpForce;
+function jumpWithVoice(volume) {
+    // Normalizamos volumen
+    let jumpStrength = volume * 1.2;
+
+    // Clamps
+    if (jumpStrength < MIN_JUMP) jumpStrength = MIN_JUMP;
+    if (jumpStrength > MAX_JUMP) jumpStrength = MAX_JUMP;
+
+    dino.velocityY = -jumpStrength;
     dino.onGround = false;
     jumpCount++;
 
@@ -175,14 +185,11 @@ function update() {
         return;
     }
 
-    // ================================
-    // JUEGO ACTIVO
-    // ================================
     volume = getMicVolume();
 
-    // 🔴 SALTO POR PICO DE SONIDO
+    // 🔴 SALTO POR INTENSIDAD
     if (volume > SOUND_THRESHOLD && dino.onGround && canJumpBySound) {
-        jump();
+        jumpWithVoice(volume);
         canJumpBySound = false;
     }
 
@@ -223,12 +230,11 @@ function update() {
         }
     });
 
-    // Troncos
     logs.forEach(log => {
         ctx.fillRect(log.x, log.y, log.width, log.height);
     });
 
-    // Texto
+    // UI
     ctx.fillStyle = "#000";
     ctx.font = "20px Arial";
     ctx.fillText("DinoLomas", 10, 25);
